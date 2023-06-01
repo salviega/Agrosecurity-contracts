@@ -20,7 +20,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	using Counters for Counters.Counter;
 
 	bytes32 public constant ADMIN_ROLE = keccak256('ADMIN_ROLE');
-	Counters.Counter public protectAreaIdCounter;
+	Counters.Counter public projectIdCounter;
 
 	/* Constants and immutable */
 
@@ -162,13 +162,13 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	function setTokenURI(
 		string[] memory _detectionDate,
 		string[] memory _forestCoverExtension,
-		uint256 _tokenId,
+		uint256 _projectId,
 		string memory _tokenURI
 	) public onlyRole(ADMIN_ROLE) {
-		Project storage project = Projects[_tokenId];
+		Project storage project = Projects[_projectId];
 
 		if (project.state == State.Monitor) {
-			_setTokenURI(_tokenId, _tokenURI);
+			_setTokenURI(_projectId, _tokenURI);
 
 			ImageTimeSeries memory imageTimeSeries = ImageTimeSeries(
 				_detectionDate,
@@ -215,9 +215,9 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	// *********************************** //
 
 	function _getNextProjectId() private returns (uint256) {
-		uint256 ProjectId = protectAreaIdCounter.current();
-		protectAreaIdCounter.increment();
-		return ProjectId;
+		uint256 projectId = projectIdCounter.current();
+		projectIdCounter.increment();
+		return projectId;
 	}
 
 	function _setNewProjectData(
@@ -244,4 +244,105 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	// ************************************ //
 	// *        Getters & Setters         * //
 	// ************************************ //
+
+	function getProjects()
+		public
+		view
+		onlyRole(ADMIN_ROLE)
+		returns (Project[] memory)
+	{
+		uint256 projectCount = projectIdCounter.current();
+		Project[] memory projects = new Project[](projectCount);
+		uint256 projectsCount = 0;
+
+		for (uint256 i = 1; i <= projectCount; i++) {
+			Project storage project = Projects[i];
+			projects[projectsCount] = project;
+			projectsCount++;
+		}
+
+		// Resize the array to remove any unused slots
+		assembly {
+			mstore(ownedProjects, ownedProjectsCount)
+		}
+
+		return projects;
+	}
+
+	function getProjectsByOwner() public view returns (Project[] memory) {
+		uint256 projectCount = protectAreaIdCounter.current();
+		Project[] memory ownedProjects = new Project[](projectCount);
+		uint256 ownedProjectsCount = 0;
+
+		for (uint256 i = 1; i <= projectCount; i++) {
+			Project storage project = Projects[i];
+			if (project.owner == msg.sender) {
+				ownedProjects[ownedProjectsCount] = project;
+				ownedProjectsCount++;
+			}
+		}
+
+		// Resize the array to remove any unused slots
+		assembly {
+			mstore(ownedProjects, ownedProjectsCount)
+		}
+
+		return ownedProjects;
+	}
+
+	function getDetectionDatesAndForestCoverExtensionsByProjectId(
+		uint256 _projectId
+	) public view returns (string[][] memory) {
+		Project storage project = Projects[_projectId];
+		require(
+			project.owner == msg.sender || hasRole(ADMIN_ROLE, msg.sender),
+			'Access denied'
+		);
+
+		string[][] memory detectionData = new string[][](2);
+		detectionData[0] = project.imageTimeSeries.detectionDate;
+		detectionData[1] = project.imageTimeSeries.forestCoverExtension;
+
+		// Temporary arrays to store monitoring data
+		string[] memory tempDetectionDates = new string[](
+			project.monitoring.length
+		);
+		string[] memory tempForestCoverExtensions = new string[](
+			project.monitoring.length
+		);
+
+		// Retrieve monitoring data
+		for (uint256 i = 0; i < project.monitoring.length; i++) {
+			tempDetectionDates[i] = project.monitoring[i].detectionDate;
+			tempForestCoverExtensions[i] = project.monitoring[i].forestCoverExtension;
+		}
+
+		// Concatenate monitoring data with detectionData arrays
+		detectionData[0] = concatenateArrays(detectionData[0], tempDetectionDates);
+		detectionData[1] = concatenateArrays(
+			detectionData[1],
+			tempForestCoverExtensions
+		);
+
+		return detectionData;
+	}
+
+	// ************************************ //
+	// *        Helpers functions         * //
+	// ************************************ //
+
+	function concatenateArrays(
+		string[] memory a,
+		string[] memory b
+	) private pure returns (string[] memory) {
+		string[] memory result = new string[](a.length + b.length);
+		uint256 i;
+		for (i = 0; i < a.length; i++) {
+			result[i] = a[i];
+		}
+		for (uint256 j = 0; j < b.length; j++) {
+			result[i++] = b[j];
+		}
+		return result;
+	}
 }

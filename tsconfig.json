@@ -9,7 +9,7 @@
 		"noImplicitAny": true,
 		"noImplicitReturns": true
 	},
-	"include": ["scripts", "./test"],
+	"include": ["deploy", "./test"],
 	"exclude": ["node_modules"],
 	"files": ["./hardhat.config.ts"]
 }
