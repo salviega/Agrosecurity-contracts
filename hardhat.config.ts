@@ -1,33 +1,34 @@
-import { config as dotEnvConfig } from 'dotenv'
-dotEnvConfig()
-
-import { HardhatUserConfig } from 'hardhat/types'
-
 import '@nomiclabs/hardhat-waffle'
-import '@typechain/hardhat'
 import '@nomiclabs/hardhat-etherscan'
+import '@nomiclabs/hardhat-ethers'
+import '@typechain/hardhat'
+import 'dotenv/config'
+import 'hardhat-deploy'
+import 'hardhat-gas-reporter'
 import 'solidity-coverage'
 
-interface Etherscan {
-	etherscan: { apiKey: string | undefined }
-}
+import { CustomHardhatConfig } from './models/custom-hardhat-config.model'
 
-type HardhatUserEtherscanConfig = HardhatUserConfig & Etherscan
+require('dotenv').config()
 
-const { POLYGONSCAN_API_KEY, PRIVATE_KEY } = process.env
+const { COINMARKETCAP_API_KEY, POLYGONSCAN_API_KEY, PRIVATE_KEY } = process.env
 
-const defaultNetwork = 'localhost'
+const defaultNetwork = 'hardhat' // change the defaul network if you want to deploy onchain
 
-const config: HardhatUserEtherscanConfig = {
+const config: CustomHardhatConfig = {
 	defaultNetwork,
 	networks: {
-		hardhat: {},
+		hardhat: {
+			chainId: 31337,
+			allowUnlimitedContractSize: true
+		},
 		localhost: {
-			url: 'http://127.0.0.1:8545'
+			chainId: 31337,
+			allowUnlimitedContractSize: true
 		},
 		mumbai: {
 			chainId: 80001,
-			accounts: [PRIVATE_KEY],
+			accounts: [PRIVATE_KEY || ''],
 			url: 'https://rpc-mumbai.maticvigil.com',
 			gas: 6000000, // Increase the gas limit
 			gasPrice: 10000000000 // Set a custom gas price (in Gwei, optional)
@@ -37,9 +38,20 @@ const config: HardhatUserEtherscanConfig = {
 		}
 	},
 	etherscan: {
-		// Your API key for Etherscan
-		// Obtain one at https://etherscan.io/
 		apiKey: POLYGONSCAN_API_KEY
+	},
+	gasReporter: {
+		enabled: true,
+		currency: 'USD',
+		outputFile: 'gas-report.txt',
+		excludeContracts: ['Migrations'], // Exclude specific contracts if needed
+		src: './contracts' // Directory containing the contracts
+	},
+	namedAccounts: {
+		deployer: {
+			default: 0,
+			1: 0
+		}
 	},
 	solidity: {
 		version: '0.8.19',
@@ -50,6 +62,9 @@ const config: HardhatUserEtherscanConfig = {
 				details: { yul: false }
 			}
 		}
+	},
+	mocha: {
+		timeout: 200000
 	}
 }
 

@@ -2,14 +2,16 @@
 .vscode
 
 # hardhat
+.notes.md
 artifacts
 cache
-deployments
-node_modules
 coverage
 coverage.json
+deployments
+gas-report.txt
+node_modules
 typechain
-
+typechain-types
 # don't push the environment vars!
 .env
 

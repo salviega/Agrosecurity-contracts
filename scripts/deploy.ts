@@ -1,35 +1,33 @@
-import { ethers } from "hardhat";
+import { HardhatRuntimeEnvironment } from 'hardhat/types'
+import { DeployFunction } from 'hardhat-deploy/types'
+import { developmentChains, networkConfig } from '../helper-hardhat-config'
+import verify from '../helper-functions'
 
-async function deployAContract(contractName: string) {
-  const factory = await ethers.getContractFactory(contractName);
-  let contract = await factory.deploy();
+const deployCounter: DeployFunction = async function (
+	hre: HardhatRuntimeEnvironment
+) {
+	// @ts-ignore
+	const { getNamedAccounts, deployments, network } = hre
+	const { deploy, log } = deployments
+	const { deployer } = await getNamedAccounts()
 
-  console.log(
-    `${contractName}: The address the Contract WILL have once mined: ${contract.address}`
-  );
+	log('----------------------------------------------------')
+	log('Deploying Counter contract and waiting for confirmations...')
 
-  console.log(
-    `The transaction that was sent to the network to deploy the Contract: ${contract.deployTransaction.hash
-    }`
-  );
+	const counterContract = await deploy('Counter', {
+		from: deployer,
+		args: [],
+		log: true,
+		waitConfirmations: networkConfig[network.name].blockConfirmations || 1
+	})
 
-  console.log(
-    'The contract is NOT deployed yet; we must wait until it is mined...'
-  );
-
-  await contract.deployed();
-  console.log('Mined!\n\n-------------------\n\n');
+	if (
+		!developmentChains.includes(network.name) &&
+		process.env.POLYGONSCAN_API_KEY
+	) {
+		await verify(counterContract.address, [])
+	}
 }
 
-async function main() {
-  console.log("\n\n")
-  await deployAContract("Counter");
-  await deployAContract("Adoption");
-}
-
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+export default deployCounter
+deployCounter.tags = ['all', 'Counter']
