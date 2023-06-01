@@ -64,7 +64,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 
 	/* Storage */
 
-	mapping(uint256 => Project) Projects;
+	mapping(uint256 => Project) public Projects;
 
 	/* Events */
 
@@ -263,14 +263,14 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 
 		// Resize the array to remove any unused slots
 		assembly {
-			mstore(ownedProjects, ownedProjectsCount)
+			mstore(projects, projectsCount)
 		}
 
 		return projects;
 	}
 
 	function getProjectsByOwner() public view returns (Project[] memory) {
-		uint256 projectCount = protectAreaIdCounter.current();
+		uint256 projectCount = projectIdCounter.current();
 		Project[] memory ownedProjects = new Project[](projectCount);
 		uint256 ownedProjectsCount = 0;
 
