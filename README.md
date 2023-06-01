@@ -21,7 +21,7 @@ yarn
 > Run the project:
 
 ```
-yarn dev
+yarn chain
 ```
 
 ## Authors 🏗
