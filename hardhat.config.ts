@@ -13,7 +13,7 @@ require('dotenv').config()
 
 const { COINMARKETCAP_API_KEY, POLYGONSCAN_API_KEY, PRIVATE_KEY } = process.env
 
-const defaultNetwork = 'hardhat' // change the defaul network if you want to deploy onchain      0         bg
+const defaultNetwork = 'mumbai' // change the defaul network if you want to deploy onchain      0         bg
 const config: CustomHardhatConfig = {
 	defaultNetwork,
 	networks: {
