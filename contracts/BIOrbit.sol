@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.17;
 
-import '@openzeppelin/contracts/access/AccessControl.sol';
-import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import '@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol';
 import '@openzeppelin/contracts/utils/Counters.sol';
@@ -16,10 +14,9 @@ import '@openzeppelin/contracts/utils/Counters.sol';
  *
  */
 
-contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
+contract BIOrbit is ERC721, ERC721URIStorage {
 	using Counters for Counters.Counter;
 
-	bytes32 public constant ADMIN_ROLE = keccak256('ADMIN_ROLE');
 	Counters.Counter public projectIdCounter;
 
 	/* Constants and immutable */
@@ -50,7 +47,6 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	struct Project {
 		uint256 id;
 		string uri;
-		IERC721 nft;
 		State state;
 		string name;
 		string description;
@@ -79,10 +75,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 		address owner
 	);
 
-	constructor() ERC721('BIOrbit', 'BIO') {
-		_setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-		_setupRole(ADMIN_ROLE, msg.sender);
-	}
+	constructor() ERC721('BIOrbit', 'BIO') {}
 
 	function mintProject(
 		string memory _name,
@@ -164,7 +157,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 		string[] memory _forestCoverExtension,
 		uint256 _projectId,
 		string memory _tokenURI
-	) public onlyRole(ADMIN_ROLE) {
+	) public {
 		Project storage project = Projects[_projectId];
 
 		if (project.state == State.Monitor) {
@@ -176,6 +169,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 			);
 			project.imageTimeSeries = imageTimeSeries;
 			project.state = State.Active;
+			project.uri = _tokenURI;
 			return;
 		}
 
@@ -185,6 +179,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 				_forestCoverExtension[0]
 			);
 			project.monitoring.push(monitoring);
+			project.uri = _tokenURI;
 			return;
 		}
 	}
@@ -201,12 +196,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 
 	function supportsInterface(
 		bytes4 interfaceId
-	)
-		public
-		view
-		override(ERC721, ERC721URIStorage, AccessControl)
-		returns (bool)
-	{
+	) public view override(ERC721, ERC721URIStorage) returns (bool) {
 		return super.supportsInterface(interfaceId);
 	}
 
@@ -215,8 +205,8 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	// *********************************** //
 
 	function _getNextProjectId() private returns (uint256) {
-		uint256 projectId = projectIdCounter.current();
 		projectIdCounter.increment();
+		uint256 projectId = projectIdCounter.current();
 		return projectId;
 	}
 
@@ -245,17 +235,12 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 	// *        Getters & Setters         * //
 	// ************************************ //
 
-	function getProjects()
-		public
-		view
-		onlyRole(ADMIN_ROLE)
-		returns (Project[] memory)
-	{
+	function getProjects() public view returns (Project[] memory) {
 		uint256 projectCount = projectIdCounter.current();
 		Project[] memory projects = new Project[](projectCount);
 		uint256 projectsCount = 0;
 
-		for (uint256 i = 1; i <= projectCount; i++) {
+		for (uint256 i = 0; i <= projectCount; i++) {
 			Project storage project = Projects[i];
 			projects[projectsCount] = project;
 			projectsCount++;
@@ -294,10 +279,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 		uint256 _projectId
 	) public view returns (string[][] memory) {
 		Project storage project = Projects[_projectId];
-		require(
-			project.owner == msg.sender || hasRole(ADMIN_ROLE, msg.sender),
-			'Access denied'
-		);
+		require(project.owner == msg.sender, 'Access denied');
 
 		string[][] memory detectionData = new string[][](2);
 		detectionData[0] = project.imageTimeSeries.detectionDate;
@@ -312,7 +294,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, AccessControl, ReentrancyGuard {
 		);
 
 		// Retrieve monitoring data
-		for (uint256 i = 0; i < project.monitoring.length; i++) {
+		for (uint256 i = 1; i < project.monitoring.length; i++) {
 			tempDetectionDates[i] = project.monitoring[i].detectionDate;
 			tempForestCoverExtensions[i] = project.monitoring[i].forestCoverExtension;
 		}
