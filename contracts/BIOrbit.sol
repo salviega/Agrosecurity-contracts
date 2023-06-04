@@ -58,6 +58,18 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		Monitoring[] monitoring;
 	}
 
+	struct ProjectLite {
+		uint256 id;
+		string uri;
+		State state;
+		string name;
+		string description;
+		string extension;
+		string[][] footprint;
+		string country;
+		address owner;
+	}
+
 	/* Storage */
 
 	mapping(uint256 => Project) public Projects;
@@ -273,6 +285,38 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		}
 
 		return ownedProjects;
+	}
+
+	function getProjectsNotOwned() public view returns (ProjectLite[] memory) {
+		uint256 projectCount = projectIdCounter.current();
+		ProjectLite[] memory notOwnedProjects = new ProjectLite[](projectCount);
+		uint256 notOwnedProjectsCount = 0;
+
+		for (uint256 i = 1; i <= projectCount; i++) {
+			Project storage project = Projects[i];
+			if (project.owner != msg.sender) {
+				ProjectLite memory projectLite = ProjectLite({
+					id: project.id,
+					uri: project.uri,
+					state: project.state,
+					name: project.name,
+					description: project.description,
+					extension: project.extension,
+					footprint: project.footprint,
+					country: project.country,
+					owner: project.owner
+				});
+				notOwnedProjects[notOwnedProjectsCount] = projectLite;
+				notOwnedProjectsCount++;
+			}
+		}
+
+		// Resize the array to remove any unused slots
+		assembly {
+			mstore(notOwnedProjects, notOwnedProjectsCount)
+		}
+
+		return notOwnedProjects;
 	}
 
 	function getDetectionDatesAndForestCoverExtensionsByProjectId(
