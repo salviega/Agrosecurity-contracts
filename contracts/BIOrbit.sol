@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import '@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol';
 import '@openzeppelin/contracts/utils/Counters.sol';
@@ -14,14 +15,18 @@ import '@openzeppelin/contracts/utils/Counters.sol';
  *
  */
 
-contract BIOrbit is ERC721, ERC721URIStorage {
+interface DataFeedsInterface {
+	function getLatestData() external view returns (int);
+}
+
+contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 	using Counters for Counters.Counter;
 
 	Counters.Counter public projectIdCounter;
 
 	/* Constants and immutable */
 
-	uint256 public cost = 550000000000000; // This is equivalent to 0.00055 ETH = 1 USD
+	address dataFeedsAddress;
 	uint256 public rentTime = 30 days;
 	uint256 public fundsScience = 0;
 	uint256 public fundsBIorbit = 0;
@@ -104,7 +109,9 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		uint256 rent
 	);
 
-	constructor() ERC721('BIOrbit', 'BIO') {}
+	constructor(address _dataFeedsAddress) ERC721('BIOrbit', 'BIO') {
+		dataFeedsAddress = _dataFeedsAddress;
+	}
 
 	function mintProject(
 		string memory _name,
@@ -118,7 +125,8 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		Project storage newProject = Projects[projectId];
 
 		uint256 extension = parseDecimalStringToInt(_extension);
-		uint256 monitoringCost = extension * cost;
+		uint256 monitoringCost = extension *
+			uint256(DataFeedsInterface(dataFeedsAddress).getLatestData());
 
 		require(
 			msg.value >= monitoringCost,
@@ -159,7 +167,7 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		);
 	}
 
-	function rentProject(uint256 _projectId) external payable {
+	function rentProject(uint256 _projectId) external payable nonReentrant {
 		Project storage project = Projects[_projectId];
 
 		require(project.owner != msg.sender, "You can't rent your own project");
@@ -167,11 +175,11 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		require(project.isRent, "Project isn't for rent");
 		require(project.rentCost == msg.value, 'Rent price is incorrect');
 
-		uint256 contractShare = project.rentCost / 5;
-		uint256 ownerShare = msg.value - contractShare;
-		payable(project.owner).transfer(ownerShare);
+		uint256 fundsScienceShare = project.rentCost / 5;
+		uint256 fundsBIorbitShare = fundsScienceShare / 2;
 
-		fundsScience += contractShare;
+		fundsScienceShare -= fundsBIorbit;
+		uint256 ownerShare = msg.value - fundsScienceShare;
 
 		RentInfo memory newRentInfo = RentInfo({
 			renter: msg.sender,
@@ -180,6 +188,10 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		});
 
 		project.rentInfo.push(newRentInfo);
+
+		fundsScience += fundsScienceShare;
+		fundsBIorbit += fundsBIorbitShare;
+		payable(project.owner).transfer(ownerShare);
 	}
 
 	function safeTransferFrom(
@@ -467,6 +479,21 @@ contract BIOrbit is ERC721, ERC721URIStorage {
 		}
 
 		project.isRent = false;
+	}
+
+	function setRentCost(uint256 _projectId) public payable {
+		Project storage project = Projects[_projectId];
+		require(project.owner == msg.sender, 'Access denied');
+
+		uint256 newRentCost = uint256(
+			DataFeedsInterface(dataFeedsAddress).getLatestData()
+		);
+		uint256 fundsScienceShare = newRentCost / 10;
+		require(fundsScienceShare >= msg.value, 'Donation price is incorrect');
+
+		fundsScience += fundsScienceShare;
+
+		project.rentCost = newRentCost;
 	}
 
 	// ************************************ //

@@ -3,7 +3,7 @@ import { DeployFunction } from 'hardhat-deploy/types'
 import { developmentChains, networkConfig } from '../helper-hardhat-config'
 import verify from '../helper-functions'
 
-const deployBIOrbit: DeployFunction = async function (
+const deployDataConsumerV3: DeployFunction = async function (
 	hre: HardhatRuntimeEnvironment
 ) {
 	// @ts-ignore
@@ -12,9 +12,9 @@ const deployBIOrbit: DeployFunction = async function (
 	const { deployer } = await getNamedAccounts()
 
 	log('----------------------------------------------------')
-	log('Deploying BIOrbit contract and waiting for confirmations...')
+	log('Deploying DataConsumerV3 contract and waiting for confirmations...')
 
-	const BIOrbitContract = await deploy('BIOrbit', {
+	const DataFeedsContract = await deploy('DataConsumerV3', {
 		from: deployer,
 		args: [],
 		log: true,
@@ -25,9 +25,9 @@ const deployBIOrbit: DeployFunction = async function (
 		!developmentChains.includes(network.name) &&
 		process.env.POLYGONSCAN_API_KEY
 	) {
-		await verify(BIOrbitContract.address, [])
+		await verify(DataFeedsContract.address, [])
 	}
 }
 
-export default deployBIOrbit
-deployBIOrbit.tags = ['all', 'BIOrbit']
+export default deployDataConsumerV3
+deployDataConsumerV3.tags = ['all', 'DataConsumerV3']
