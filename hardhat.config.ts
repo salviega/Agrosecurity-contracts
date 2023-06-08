@@ -18,11 +18,11 @@ const config: CustomHardhatConfig = {
 	defaultNetwork,
 	networks: {
 		hardhat: {
-			chainId: 31337,
+			chainId: 1337,
 			allowUnlimitedContractSize: true
 		},
 		localhost: {
-			chainId: 31337,
+			chainId: 1337,
 			allowUnlimitedContractSize: true
 		},
 		mumbai: {

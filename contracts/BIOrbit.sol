@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import '@openzeppelin/contracts/security/ReentrancyGuard.sol';
 import '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 import '@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol';
 import '@openzeppelin/contracts/utils/Counters.sol';
@@ -19,7 +18,7 @@ interface DataFeedsInterface {
 	function getLatestData() external view returns (int);
 }
 
-contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
+contract BIOrbit is ERC721, ERC721URIStorage {
 	using Counters for Counters.Counter;
 
 	Counters.Counter public projectIdCounter;
@@ -28,8 +27,6 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 
 	address dataFeedsAddress;
 	uint256 public rentTime = 30 days;
-	uint256 public fundsScience = 0;
-	uint256 public fundsBIorbit = 0;
 
 	/* Enumerables */
 
@@ -44,7 +41,6 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 
 	struct RentInfo {
 		address renter;
-		uint256 value;
 		uint256 expiry;
 	}
 
@@ -64,11 +60,11 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		uint256 id;
 		string uri;
 		State state;
-		string name;
-		string description;
-		string extension;
+		bytes32 name;
+		bytes32 description;
+		bytes32 extension;
 		string[][] footprint;
-		string country;
+		bytes32 country;
 		address owner;
 		ImageTimeSeries imageTimeSeries;
 		Monitoring[] monitoring;
@@ -80,11 +76,11 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 	struct ProjectLite {
 		uint256 id;
 		State state;
-		string name;
-		string description;
-		string extension;
+		bytes32 name;
+		bytes32 description;
+		bytes32 extension;
 		string[][] footprint;
-		string country;
+		bytes32 country;
 		address owner;
 		bool isRent;
 		uint256 rentCost;
@@ -99,11 +95,11 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 	event ProjectCreated(
 		uint256 id,
 		State state,
-		string name,
-		string description,
-		string extension,
+		bytes32 name,
+		bytes32 description,
+		bytes32 extension,
 		string[][] footprint,
-		string country,
+		bytes32 country,
 		address owner,
 		bool isRent,
 		uint256 rent
@@ -114,42 +110,30 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 	}
 
 	function mintProject(
-		string memory _name,
-		string memory _description,
-		string memory _extension,
+		bytes32 _name,
+		bytes32 _description,
+		bytes32 _extension,
 		string[][] memory _footprint,
-		string memory _country,
+		bytes32 _country,
 		bool _isRent
 	) external payable {
-		uint256 projectId = _getNextProjectId();
+		projectIdCounter.increment();
+		uint256 projectId = projectIdCounter.current();
+
 		Project storage newProject = Projects[projectId];
 
-		uint256 extension = parseDecimalStringToInt(_extension);
-		uint256 monitoringCost = extension *
-			uint256(DataFeedsInterface(dataFeedsAddress).getLatestData());
+		uint256 rentCost = msg.value / 10;
 
-		require(
-			msg.value >= monitoringCost,
-			'Insufficient payment, monitoringCost required'
-		);
-
-		fundsBIorbit += msg.value;
-
-		uint256 rentCost = monitoringCost / 5;
-
-		_setNewProjectData(
-			newProject,
-			projectId,
-			State.Monitor,
-			_name,
-			_description,
-			_extension,
-			_footprint,
-			_country,
-			msg.sender,
-			_isRent,
-			rentCost
-		);
+		newProject.id = projectId;
+		newProject.state = State.Monitor;
+		newProject.name = _name;
+		newProject.description = _description;
+		newProject.extension = _extension;
+		newProject.footprint = _footprint;
+		newProject.country = _country;
+		newProject.owner = msg.sender;
+		newProject.isRent = _isRent;
+		newProject.rentCost = rentCost;
 
 		_safeMint(msg.sender, projectId);
 
@@ -167,7 +151,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		);
 	}
 
-	function rentProject(uint256 _projectId) external payable nonReentrant {
+	function rentProject(uint256 _projectId) external payable {
 		Project storage project = Projects[_projectId];
 
 		require(project.owner != msg.sender, "You can't rent your own project");
@@ -175,23 +159,14 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		require(project.isRent, "Project isn't for rent");
 		require(project.rentCost == msg.value, 'Rent price is incorrect');
 
-		uint256 fundsScienceShare = project.rentCost / 5;
-		uint256 fundsBIorbitShare = fundsScienceShare / 2;
-
-		fundsScienceShare -= fundsBIorbit;
-		uint256 ownerShare = msg.value - fundsScienceShare;
-
 		RentInfo memory newRentInfo = RentInfo({
 			renter: msg.sender,
-			value: project.rentCost,
 			expiry: block.timestamp + rentTime
 		});
 
 		project.rentInfo.push(newRentInfo);
 
-		fundsScience += fundsScienceShare;
-		fundsBIorbit += fundsBIorbitShare;
-		payable(project.owner).transfer(ownerShare);
+		payable(project.owner).transfer(msg.value);
 	}
 
 	function safeTransferFrom(
@@ -239,19 +214,6 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 	) public {
 		Project storage project = Projects[_projectId];
 
-		if (project.state == State.Monitor) {
-			_setTokenURI(_projectId, _projectURI);
-
-			ImageTimeSeries memory imageTimeSeries = ImageTimeSeries(
-				_detectionDate,
-				_forestCoverExtension
-			);
-			project.imageTimeSeries = imageTimeSeries;
-			project.state = State.Active;
-			project.uri = _projectURI;
-			return;
-		}
-
 		if (project.state == State.Active) {
 			_setTokenURI(_projectId, _projectURI);
 
@@ -261,6 +223,18 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 			);
 
 			project.monitoring.push(monitoring);
+			project.uri = _projectURI;
+		}
+
+		if (project.state == State.Monitor) {
+			_setTokenURI(_projectId, _projectURI);
+
+			ImageTimeSeries memory imageTimeSeries = ImageTimeSeries(
+				_detectionDate,
+				_forestCoverExtension
+			);
+			project.imageTimeSeries = imageTimeSeries;
+			project.state = State.Active;
 			project.uri = _projectURI;
 		}
 	}
@@ -283,7 +257,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		for (uint256 i = 0; i < project.rentInfo.length; i++) {
 			if (project.rentInfo[i].expiry > block.timestamp) {
 				hasActiveRenters = true;
-				uint256 rentAmount = project.rentInfo[i].value;
+				uint256 rentAmount = project.rentCost;
 				payable(project.rentInfo[i].renter).transfer(rentAmount);
 			}
 		}
@@ -304,27 +278,13 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 	// *        Getters & Setters         * //
 	// ************************************ //
 
-	function getProjects() public view returns (Project[] memory) {
-		uint256 projectCount = projectIdCounter.current();
-		Project[] memory projects = new Project[](projectCount);
-		uint256 projectsCount = 0;
-
-		for (uint256 i = 0; i <= projectCount; i++) {
-			Project storage project = Projects[i];
-			projects[projectsCount] = project;
-			projectsCount++;
-		}
-
-		// Resize the array to remove any unused slots
-		assembly {
-			mstore(projects, projectsCount)
-		}
-
-		return projects;
-	}
-
 	function getProjectsByOwner() public view returns (Project[] memory) {
 		uint256 projectCount = projectIdCounter.current();
+
+		if (projectCount == 0) {
+			return new Project[](0);
+		}
+
 		Project[] memory ownedProjects = new Project[](projectCount);
 		uint256 ownedProjectsCount = 0;
 
@@ -346,6 +306,11 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 
 	function getActiveRentingProjects() public view returns (Project[] memory) {
 		uint256 projectCount = projectIdCounter.current();
+
+		if (projectCount == 0) {
+			return new Project[](0);
+		}
+
 		Project[] memory activeRentingProjects = new Project[](projectCount);
 		uint256 activeRentingProjectsCount = 0;
 
@@ -377,6 +342,11 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		returns (ProjectLite[] memory)
 	{
 		uint256 projectCount = projectIdCounter.current();
+
+		if (projectCount == 0) {
+			return new ProjectLite[](0);
+		}
+
 		ProjectLite[] memory notOwnedProjects = new ProjectLite[](projectCount);
 		uint256 notOwnedProjectsCount = 0;
 
@@ -418,51 +388,18 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		return notOwnedProjects;
 	}
 
-	function getDetectionDatesAndForestCoverExtensionsByProjectId(
-		uint256 _projectId
-	) public view returns (string[][] memory) {
-		Project storage project = Projects[_projectId];
-		require(project.owner == msg.sender, 'Access denied');
-
-		string[][] memory detectionData = new string[][](2);
-		detectionData[0] = project.imageTimeSeries.detectionDate;
-		detectionData[1] = project.imageTimeSeries.forestCoverExtension;
-
-		// Temporary arrays to store monitoring data
-		string[] memory tempDetectionDates = new string[](
-			project.monitoring.length
-		);
-		string[] memory tempForestCoverExtensions = new string[](
-			project.monitoring.length
-		);
-
-		// Retrieve monitoring data
-		for (uint256 i = 1; i < project.monitoring.length; i++) {
-			tempDetectionDates[i] = project.monitoring[i].detectionDate;
-			tempForestCoverExtensions[i] = project.monitoring[i].forestCoverExtension;
-		}
-
-		// Concatenate monitoring data with detectionData arrays
-		detectionData[0] = concatenateArrays(detectionData[0], tempDetectionDates);
-		detectionData[1] = concatenateArrays(
-			detectionData[1],
-			tempForestCoverExtensions
-		);
-
-		return detectionData;
+	function getLatestData() public view returns (uint256) {
+		return uint256(DataFeedsInterface(dataFeedsAddress).getLatestData());
 	}
 
-	function setName(uint256 _projectId, string memory _name) public {
+	function setName(uint256 _projectId, bytes32 _name) public {
 		Project storage project = Projects[_projectId];
 		require(project.owner == msg.sender, 'Access denied');
 
 		project.name = _name;
 	}
 
-	function setDescription(
-		uint256 _projectId,
-		string memory _description
-	) public {
+	function setDescription(uint256 _projectId, bytes32 _description) public {
 		Project storage project = Projects[_projectId];
 		require(project.owner == msg.sender, 'Access denied');
 
@@ -485,15 +422,7 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		Project storage project = Projects[_projectId];
 		require(project.owner == msg.sender, 'Access denied');
 
-		uint256 newRentCost = uint256(
-			DataFeedsInterface(dataFeedsAddress).getLatestData()
-		);
-		uint256 fundsScienceShare = newRentCost / 10;
-		require(fundsScienceShare >= msg.value, 'Donation price is incorrect');
-
-		fundsScience += fundsScienceShare;
-
-		project.rentCost = newRentCost;
+		project.rentCost = getLatestData();
 	}
 
 	// ************************************ //
@@ -515,51 +444,6 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		return result;
 	}
 
-	function parseDecimalStringToInt(
-		string memory s
-	) private pure returns (uint256) {
-		bytes memory b = bytes(s);
-		uint256 result;
-		uint256 dec;
-		bool hasDec;
-		uint256 length = b.length;
-		for (uint j = 0; j < length; j++) {
-			if ((uint8(b[j]) >= 48) && (uint8(b[j]) <= 57)) {
-				if (hasDec) {
-					dec++;
-					// Require that the number have only two decimals
-					require(dec <= 2, 'Number must have at most 2 decimal places');
-					result = result * 10 + (uint(uint8(b[j])) - 48);
-				} else {
-					result = result * 10 + (uint(uint8(b[j])) - 48);
-				}
-			} else if (uint8(b[j]) == 46) {
-				require(!hasDec, 'More than one decimal point');
-				hasDec = true;
-			} else {
-				revert('Invalid character');
-			}
-		}
-
-		// Require that the number be greater than 1
-		require(
-			result > 100 || (result == 100 && dec > 0),
-			'Number must be greater than 1'
-		);
-
-		// If it doesn't have decimals, convert it to integer
-		if (!hasDec) {
-			return result;
-		}
-
-		// Adjust the number according to the decimals
-		if (dec < 2) {
-			result *= 10 ** (2 - dec);
-		}
-
-		return result;
-	}
-
 	// *********************************** //
 	// *        Private functions         * //
 	// *********************************** //
@@ -568,36 +452,5 @@ contract BIOrbit is ERC721, ERC721URIStorage, ReentrancyGuard {
 		uint256 _projectId
 	) internal override(ERC721, ERC721URIStorage) {
 		super._burn(_projectId);
-	}
-
-	function _getNextProjectId() private returns (uint256) {
-		projectIdCounter.increment();
-		uint256 projectId = projectIdCounter.current();
-		return projectId;
-	}
-
-	function _setNewProjectData(
-		Project storage _newProject,
-		uint256 _id,
-		State _state,
-		string memory _name,
-		string memory _description,
-		string memory _extension,
-		string[][] memory _footprint,
-		string memory _country,
-		address _owner,
-		bool _isRent,
-		uint256 _rentCost
-	) private {
-		_newProject.id = _id;
-		_newProject.state = _state;
-		_newProject.name = _name;
-		_newProject.description = _description;
-		_newProject.extension = _extension;
-		_newProject.footprint = _footprint;
-		_newProject.country = _country;
-		_newProject.owner = _owner;
-		_newProject.isRent = _isRent;
-		_newProject.rentCost = _rentCost;
 	}
 }

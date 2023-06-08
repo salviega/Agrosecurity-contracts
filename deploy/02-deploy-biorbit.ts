@@ -26,7 +26,7 @@ const deployBIOrbit: DeployFunction = async function (
 		!developmentChains.includes(network.name) &&
 		process.env.POLYGONSCAN_API_KEY
 	) {
-		await verify(BIOrbitContract.address, [])
+		await verify(BIOrbitContract.address, [dataFeeds.address])
 	}
 }
 
