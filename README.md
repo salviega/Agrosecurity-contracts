@@ -1,6 +1,6 @@
-# BIOrbit - contracts
+# Agrosecurity - contracts
 
-BIOrbit: monitoring and guarding
+Agrosecurity: weather based insurence
 
 ## Quick start 🏄
 
@@ -9,7 +9,7 @@ Prerequisites: [Node (v16 LTS)](https://nodejs.org/en/download/) and [Git](https
 > Clone the repository:
 
 ```
-git clone https://github.com/BIOrbitCol/BIOrbit-contracts.git
+git clone https://github.com/salviega/Agrosecurity-contracts.git
 ```
 
 > Install dependencies:
@@ -26,4 +26,7 @@ yarn chain
 
 ## Authors 🏗
 
+[rookiecol](https://github.com/RookieCol)
+
 [salviega](https://github.com/salviega)
+
